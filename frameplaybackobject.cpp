@@ -92,7 +92,7 @@ quint64 FramePlaybackObject::updatePosition(bool forward)
         }
     }
 
-    return thisFrame->timeStamp().microSeconds();
+    return thisFrame->fullTimeStamp();
 }
 
 quint64 FramePlaybackObject::peekPosition(bool forward)

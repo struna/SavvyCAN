@@ -37,7 +37,7 @@ MainSettingsDialog::MainSettingsDialog(QWidget *parent) :
     ui->cbRestorePositions->setChecked(settings.value("Main/SaveRestorePositions", true).toBool());
     ui->cbValidate->setChecked(settings.value("Main/ValidateComm", true).toBool());
     ui->spinPlaybackSpeed->setValue(settings.value("Playback/DefSpeed", 5).toInt());
-    ui->lineClockFormat->setText(settings.value("Main/TimeFormat", "MMM-dd HH:mm:ss.zzz").toString());
+    ui->lineClockFormat->setText(settings.value("Main/TimeFormat", "yyyy-MM-dd HH:mm:ss.zzz").toString());
     ui->lineRemoteHost->setText(settings.value("Remote/Host", "api.savvycan.com").toString());
     ui->lineRemotePort->setText(settings.value("Remote/Port", "8883").toString()); //default port for SSL enabled MQTT
     ui->lineRemoteUser->setText(settings.value("Remote/User", "Anonymous").toString());

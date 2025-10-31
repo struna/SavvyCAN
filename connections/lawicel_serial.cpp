@@ -9,6 +9,10 @@
 #include "lawicel_serial.h"
 #include "utility.h"
 
+QElapsedTimer LAWICELSerial::_readElapsedTimer;
+uint32_t LAWICELSerial::_prevSlcanTimeStamp = 0;
+uint16_t LAWICELSerial::_loopCounter = 0;
+
 LAWICELSerial::LAWICELSerial(QString portName, int serialSpeed, int lawicelSpeed, bool canFd, int dataRate) :
     CANConnection(portName, "LAWICEL", CANCon::LAWICEL,serialSpeed, lawicelSpeed, canFd, dataRate, 3, 4000, true),
     mTimer(this) /*NB: set this as parent of timer to manage it from working thread */
@@ -17,6 +21,7 @@ LAWICELSerial::LAWICELSerial(QString portName, int serialSpeed, int lawicelSpeed
 
     serial = nullptr;
     isAutoRestart = false;
+    _loopCounter = 0;
 
     readSettings();
 }
@@ -252,6 +257,9 @@ void LAWICELSerial::connectDevice()
 
 void LAWICELSerial::deviceConnected()
 {
+    _readElapsedTimer.start();
+    _loopCounter = 0;
+    
     sendDebug("Connecting to LAWICEL Device!");
 
     QByteArray output;
@@ -491,25 +499,27 @@ void LAWICELSerial::readSerialData()
         {
             qDebug() << "Got CR!";
 
-            if (useSystemTime)
+            // https://doc.qt.io/qt-6/qcanbusframe-timestamp.html
+            // https://doc.qt.io/archives/qt-5.15/qdatetime.html#fromMSecsSinceEpoch
+            // http://www.can232.com/docs/can232_v3.pdf
+
+            uint64_t epochTimeStampInMicroseconds = QDateTime::currentMSecsSinceEpoch() * 1000ULL;
+            uint64_t connectionTimeStampInMicroseconds = _readElapsedTimer.nsecsElapsed() / 1000ULL; // to limit timestamp to 1h interval just add % (60ULL * 60ULL * 1'000'000ULL)
+            uint64_t buildTimestamp = useSystemTime ? epochTimeStampInMicroseconds : connectionTimeStampInMicroseconds;
+
+            // apply timestamp if exist on incoming slcan frame with notion that in slcan standard we have only 1 minute interval
+            // also we are assuming that connection timer and frame sender device timer are synced
+            if (data.length() > (5 + mBuildLine.mid(4, 1).toInt() * 2 + 1))
             {
-                buildFrame.setTimeStamp(QCanBusFrame::TimeStamp::fromMicroSeconds(QDateTime::currentMSecsSinceEpoch() * 1000ul));
+                //Four bytes after the end of the data bytes.
+                uint64_t slcanTimeStampInMs = mBuildLine.mid(5 + mBuildLine.mid(4, 1).toInt() * 2, 4).toULongLong(nullptr, 16);
+                if (_prevSlcanTimeStamp > slcanTimeStampInMs) _loopCounter++;
+                uint64_t startingPoint = useSystemTime ? epochTimeStampInMicroseconds - connectionTimeStampInMicroseconds : 0;
+                buildTimestamp = startingPoint + (((_loopCounter * 60'000ULL) + slcanTimeStampInMs) * 1000ULL);
+                _prevSlcanTimeStamp = slcanTimeStampInMs;
             }
-            else
-            {
-                //If total length is greater than command, header and data, timestamps must be enabled.
-                if (data.length() > (5 + mBuildLine.mid(4, 1).toInt() * 2 + 1))
-                {
-                    //Four bytes after the end of the data bytes.
-                    buildTimestamp = mBuildLine.mid(5 + mBuildLine.mid(4, 1).toInt() * 2, 4).toInt(nullptr, 16) * 1000l;
-                    buildFrame.setTimeStamp(QCanBusFrame::TimeStamp(0, buildTimestamp));
-                }
-                else
-                {
-                    //Default to system time if timestamps are disabled.
-                    buildFrame.setTimeStamp(QCanBusFrame::TimeStamp::fromMicroSeconds(QDateTime::currentMSecsSinceEpoch() * 1000ul));
-                }
-            }
+
+            buildFrame.setTimeStamp(QCanBusFrame::TimeStamp::fromMicroSeconds(buildTimestamp));
 
             switch (mBuildLine[0].toLatin1())
             {

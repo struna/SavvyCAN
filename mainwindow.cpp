@@ -426,7 +426,7 @@ void MainWindow::readUpdateableSettings()
     model->setTimeStyle(ts);
 
     useFiltered = settings.value("Main/UseFiltered", false).toBool();
-    model->setTimeFormat(settings.value("Main/TimeFormat", "MMM-dd HH:mm:ss.zzz").toString());
+    model->setTimeFormat(settings.value("Main/TimeFormat", "yyyy-MM-dd HH:mm:ss.zzz").toString());
     ignoreDBCColors = settings.value("Main/IgnoreDBCColors", false).toBool();
     model->setIgnoreDBCColors(ignoreDBCColors);
     int bpl = settings.value("Main/BytesPerLine", 8).toInt();

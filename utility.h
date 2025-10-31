@@ -11,6 +11,7 @@
 #include <QComboBox>
 #include <QStandardItemModel>
 //#include <QDesktopWidget>
+#include <QCanBusFrame>
 
 enum TimeStyle
 {
@@ -175,20 +176,21 @@ public:
 
     static QVariant formatTimestamp(uint64_t timestamp)
     {
+        // timestamp expected μs !!!!!!!!!!!!!!!
+        
         switch (timeStyle)
         {
         case TS_CLOCK:
             return QDateTime::fromMSecsSinceEpoch(timestamp / 1000);
-            break;
+            
         case TS_MILLIS:
             return (double)timestamp / 1000.0;
-            break;
+
         case TS_MICROS:
             return (unsigned long long)(timestamp);
-            break;
+
         case TS_SECONDS:
-            return (double)timestamp / 1000000.0;
-            break;
+            return (double)timestamp / 1'000'000.0;
         }
         return QVariant();
     }

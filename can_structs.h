@@ -18,8 +18,8 @@ public:
 
     friend bool operator<(const CANFrame& l, const CANFrame& r)
     {
-        qint64 lStamp = l.timeStamp().seconds() * 1000000 + l.timeStamp().microSeconds();
-        qint64 rStamp = r.timeStamp().seconds() * 1000000 + r.timeStamp().microSeconds();
+        uint64_t lStamp = l.fullTimeStamp();
+        uint64_t rStamp = r.fullTimeStamp();
         return lStamp < rStamp;
     }
 
@@ -32,6 +32,12 @@ public:
         isReceived = true;
         timedelta = 0;
         frameCount = 1;
+    }
+
+    uint64_t fullTimeStamp() const
+    {
+        return static_cast<uint64_t>(this->timeStamp().seconds()) * 1'000'000ULL
+             + static_cast<uint64_t>(this->timeStamp().microSeconds());
     }
 };
 

@@ -80,7 +80,7 @@ CANFrameModel::CANFrameModel(QObject *parent)
     timeOffset = 0;
     needFilterRefresh = false;
     lastUpdateNumFrames = 0;
-    timeFormat =  "MMM-dd HH:mm:ss.zzz";
+    timeFormat =  "yyyy-MM-dd HH:mm:ss.zzz";
     sortDirAsc = false;
     bytesPerLine = 8;
 }
@@ -152,6 +152,9 @@ void CANFrameModel::setIgnoreDBCColors(bool mode)
 */
 void CANFrameModel::normalizeTiming()
 {
+    return; // disabled for now
+    // there is a lot of bugs in this method. no seconds handling, no option to reset timeOffset, no flag that normalizeTiming was triggered
+    
     mutex.lock();
     if (frames.count() == 0) 
     {
@@ -237,8 +240,9 @@ uint64_t CANFrameModel::getCANFrameVal(QVector<CANFrame> *frames, int row, Colum
     switch (col)
     {
     case Column::TimeStamp:
+        // TODO: review overwriteDups?!?!
         if (overwriteDups) return frame.timedelta;
-        return frame.timeStamp().microSeconds();
+        return frame.fullTimeStamp();
     case Column::FrameId:
         return frame.frameId();
     case Column::Extended:
@@ -464,18 +468,19 @@ QVariant CANFrameModel::data(const QModelIndex &index, int role) const
     if (role == Qt::DisplayRole) {
         switch (Column(index.column()))
         {
-        case Column::TimeStamp:            
+        case Column::TimeStamp:
+            // TODO: review overwriteDups?!?!
             //Reformatting the output a bit with custom code
             if (overwriteDups)
             {
                 if (timeStyle == TS_SECONDS) return QString::number(thisFrame.timedelta / 1000000.0, 'f', 5);
                 return QString::number(thisFrame.timedelta);
             }
-            else ts = Utility::formatTimestamp(thisFrame.timeStamp().microSeconds());
+            else ts = Utility::formatTimestamp(thisFrame.fullTimeStamp());
             if (ts.type() == QVariant::Double) return QString::number(ts.toDouble(), 'f', 5); //never scientific notation, 5 decimal places
             if (ts.type() == QVariant::LongLong) return QString::number(ts.toLongLong()); //never scientific notion, all digits shown
             if (ts.type() == QVariant::DateTime) return ts.toDateTime().toString(timeFormat); //custom set format for dates and times
-            return Utility::formatTimestamp(thisFrame.timeStamp().microSeconds());
+            return ts;
         case Column::FrameId:
             return Utility::formatCANID(thisFrame.frameId(), thisFrame.hasExtendedFrameFormat());
         case Column::Extended:
@@ -658,7 +663,13 @@ void CANFrameModel::addFrame(const CANFrame& frame, bool autoRefresh = false)
     CANFrame tempFrame;
     tempFrame = frame;
 
-    tempFrame.setTimeStamp(QCanBusFrame::TimeStamp(0, tempFrame.timeStamp().microSeconds() - timeOffset));
+    if (timeOffset != 0) {
+        // in theory timeOffset should be diff that 0 only when normalizeTiming was triggered, but looks like it's a one time action ...
+        // ... there is no flag for that and even a way to reset timeOffset ...
+        // ... so for now I decided to disable normalizeTiming. later it could be re-enabled by something like that;
+        uint64_t adjustedTimeStamp = frame.fullTimeStamp() - timeOffset;
+        tempFrame.setTimeStamp(QCanBusFrame::TimeStamp::fromMicroSeconds(adjustedTimeStamp));
+    }
 
     lastUpdateNumFrames++;
 
